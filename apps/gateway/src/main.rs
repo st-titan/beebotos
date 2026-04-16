@@ -576,6 +576,7 @@ async fn main() -> anyhow::Result<()> {
             registry.clone(),
             app_state.memory_system.clone(),
             app_state.webchat_service.clone(),
+            app_state.ws_manager.clone(),
         )));
     }
     let app_state = Arc::new(app_state);
