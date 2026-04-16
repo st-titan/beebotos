@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # BeeBotOS Development Manager (Linux/macOS)
-# Usage: ./scripts/beebotos-dev.sh [menu|build|start|stop|restart|run|status] [service|all]
+# Usage: ./scripts/beebotos-dev.sh [menu|build|start|stop|restart|run|pack|status] [service|all]
 
 set -euo pipefail
 
@@ -195,6 +195,58 @@ build_and_start() {
     build_service "$svc" && start_service "$svc"
 }
 
+pack_release() {
+    local target="${1:-all}"
+
+    echo -e "${CYAN}----------------------------------------${NC}"
+    echo -e "${CYAN}Packing release for target: ${target}${NC}"
+    echo -e "${CYAN}----------------------------------------${NC}"
+
+    local out_dir="${PROJECT_ROOT}/dist/beebotos"
+    local archive="${PROJECT_ROOT}/dist/beebotos-$(uname -m)-unknown-linux-gnu.tar.gz"
+
+    rm -rf "${out_dir}"
+    mkdir -p "${out_dir}/pkg"
+
+    # Copy binaries and assets
+    if [[ "$target" == "all" || "$target" == "gateway" ]]; then
+        cp "${PROJECT_ROOT}/target/release/beebotos-gateway" "${out_dir}/"
+        cp -r "${PROJECT_ROOT}/migrations_sqlite" "${out_dir}/"
+    fi
+    if [[ "$target" == "all" || "$target" == "web" ]]; then
+        if [[ ! -d "${PROJECT_ROOT}/apps/web/pkg" ]]; then
+            print_error "WASM package directory not found: ${PROJECT_ROOT}/apps/web/pkg"
+            print_info "Please build web service first: ./scripts/beebotos-dev.sh build web"
+            return 1
+        fi
+        cp "${PROJECT_ROOT}/target/release/web-server" "${out_dir}/"
+        cp -r "${PROJECT_ROOT}/apps/web/pkg/." "${out_dir}/pkg/"
+    fi
+    if [[ "$target" == "all" || "$target" == "beehub" ]]; then
+        if [[ -f "${PROJECT_ROOT}/target/release/beehub" ]]; then
+            cp "${PROJECT_ROOT}/target/release/beehub" "${out_dir}/"
+        else
+            print_warn "beehub binary not found, skipping"
+        fi
+    fi
+
+    # Copy configs if they exist
+    if [[ -d "${PROJECT_ROOT}/config" ]]; then
+        cp -r "${PROJECT_ROOT}/config" "${out_dir}/"
+    fi
+
+    # Copy runner script
+    cp "${PROJECT_ROOT}/scripts/beebotos-run.sh" "${out_dir}/"
+    chmod +x "${out_dir}/beebotos-run.sh"
+
+    # Create archive
+    tar czvf "${archive}" -C "${PROJECT_ROOT}/dist" beebotos
+
+    print_success "Release packed: ${archive}"
+    echo "Contents:"
+    ls -lah "${out_dir}"
+}
+
 show_status() {
     echo -e "${CYAN}Service Status${NC}"
     echo -e "${CYAN}----------------------------------------${NC}"
@@ -251,6 +303,7 @@ show_menu() {
     echo "     5.4) Build & Start All"
     echo ""
     echo "  6) Status"
+    echo "  7) Pack Release"
     echo "  0) Exit"
     echo ""
     echo -n "Select option: "
@@ -305,6 +358,7 @@ handle_menu() {
                 done
                 ;;
             6) show_status ;;
+            7) pack_release all ;;
             0|q|quit|exit) echo "Goodbye!"; exit 0 ;;
             *) print_warn "Invalid option: $choice" ;;
         esac
@@ -370,12 +424,15 @@ handle_cli() {
                 build_and_start "$target"
             fi
             ;;
+        pack)
+            pack_release "$target"
+            ;;
         status)
             show_status
             ;;
         *)
             print_error "Unknown action: $action"
-            echo "Usage: $0 [menu|build|start|stop|restart|run|status] [service|all]"
+            echo "Usage: $0 [menu|build|start|stop|restart|run|pack|status] [service|all]"
             echo ""
             echo "Actions:"
             echo "  build    - Compile a service"
@@ -383,6 +440,7 @@ handle_cli() {
             echo "  stop     - Stop a service"
             echo "  restart  - Restart a service"
             echo "  run      - Build and start a service"
+            echo "  pack     - Package binaries and assets for deployment"
             echo "  status   - Show service status"
             echo "  menu     - Interactive menu (default)"
             echo ""

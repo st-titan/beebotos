@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # BeeBotOS Development Manager (Windows)
-# Usage: .\scripts\beebotos-dev.ps1 [menu|build|start|stop|restart|run|status] [service|all]
+# Usage: .\scripts\beebotos-dev.ps1 [menu|build|start|stop|restart|run|pack|status] [service|all]
 
 $ErrorActionPreference = "Stop"
 
@@ -188,6 +188,51 @@ function Build-And-Start($name) {
     }
 }
 
+function Pack-Release($target = "all") {
+    Write-Host "----------------------------------------" -ForegroundColor Cyan
+    Write-Host "Packing release for target: $target" -ForegroundColor Cyan
+    Write-Host "----------------------------------------" -ForegroundColor Cyan
+
+    $outDir = Join-Path $ProjectRoot "dist\beebotos"
+    $archive = Join-Path $ProjectRoot "dist\beebotos-x64-pc-windows-msvc.zip"
+
+    if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir }
+    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $outDir "pkg") | Out-Null
+
+    if ($target -eq "all" -or $target -eq "gateway") {
+        Copy-Item (Join-Path $ProjectRoot "target\release\beebotos-gateway.exe") $outDir
+        Copy-Item -Recurse (Join-Path $ProjectRoot "migrations_sqlite") $outDir
+    }
+    if ($target -eq "all" -or $target -eq "web") {
+        Copy-Item (Join-Path $ProjectRoot "target\release\web-server.exe") $outDir
+        $pkgSource = Join-Path $ProjectRoot "apps\web\pkg"
+        $pkgDest = Join-Path $outDir "pkg"
+        Get-ChildItem -Path $pkgSource | ForEach-Object {
+            Copy-Item -Path $_.FullName -Destination $pkgDest -Recurse -Force
+        }
+    }
+    if ($target -eq "all" -or $target -eq "beehub") {
+        $beehubPath = Join-Path $ProjectRoot "target\release\beehub.exe"
+        if (Test-Path $beehubPath) {
+            Copy-Item $beehubPath $outDir
+        } else {
+            Print-Warn "beehub.exe not found, skipping"
+        }
+    }
+
+    if (Test-Path (Join-Path $ProjectRoot "config")) {
+        Copy-Item -Recurse (Join-Path $ProjectRoot "config") $outDir
+    }
+
+    Copy-Item (Join-Path $ProjectRoot "scripts\beebotos-run.ps1") $outDir
+
+    Compress-Archive -Path $outDir -DestinationPath $archive -Force
+    Print-Success "Release packed: $archive"
+    Write-Host "Contents:"
+    Get-ChildItem $outDir | Format-Table Name, @{Label="Size"; Expression={$_.Length}; Align="Right"}
+}
+
 function Show-Status {
     Write-Host "Service Status" -ForegroundColor Cyan
     Write-Host "----------------------------------------" -ForegroundColor Cyan
@@ -245,6 +290,7 @@ function Show-Menu {
     Write-Host "     5.4) Build & Start All"
     Write-Host ""
     Write-Host "  6) Status"
+    Write-Host "  7) Pack Release"
     Write-Host "  0) Exit"
     Write-Host ""
     $choice = Read-Host "Select option"
@@ -299,6 +345,7 @@ function Handle-Menu {
                 }
             }
             "6" { Show-Status }
+            "7" { Pack-Release "all" }
             { $_ -in "0", "q", "quit", "exit" } { Write-Host "Goodbye!"; exit 0 }
             default { Print-Warn "Invalid option: $choice" }
         }
@@ -337,10 +384,11 @@ function Handle-Cli($action, $target = "all") {
             $list = if ($target -eq "all") { @("gateway", "web", "beehub") } else { @($target) }
             foreach ($svc in $list) { Build-And-Start $svc }
         }
+        "pack" { Pack-Release $target }
         "status" { Show-Status }
         default {
             Print-Error "Unknown action: $action"
-            Write-Host "Usage: beebotos-dev.ps1 [menu|build|start|stop|restart|run|status] [service|all]"
+            Write-Host "Usage: beebotos-dev.ps1 [menu|build|start|stop|restart|run|pack|status] [service|all]"
             Write-Host ""
             Write-Host "Actions:"
             Write-Host "  build    - Compile a service"
@@ -348,6 +396,7 @@ function Handle-Cli($action, $target = "all") {
             Write-Host "  stop     - Stop a service"
             Write-Host "  restart  - Restart a service"
             Write-Host "  run      - Build and start a service"
+            Write-Host "  pack     - Package binaries and assets for deployment"
             Write-Host "  status   - Show service status"
             Write-Host "  menu     - Interactive menu (default)"
             Write-Host ""
