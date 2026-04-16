@@ -741,7 +741,13 @@ impl LarkWebSocketClient {
                 let chat_id = message_data.get("chat_id")?.as_str()?.to_string();
                 let msg_type = message_data.get("message_type")?.as_str()?;
                 let message_id = message_data.get("message_id")?.as_str()?.to_string();
-
+                // Extract sender open_id for session management and reply routing
+                let sender_open_id = event_data
+                    .get("sender")
+                    .and_then(|s| s.get("sender_id"))
+                    .and_then(|sid| sid.get("open_id"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
                 // Parse content (it's a JSON string)
                 let content_json: serde_json::Value = serde_json::from_str(content).ok()?;
 
@@ -751,6 +757,11 @@ impl LarkWebSocketClient {
                         let text = content_json.get("text")?.as_str()?.to_string();
                         let mut meta = std::collections::HashMap::new();
                         meta.insert("message_id".to_string(), message_id.clone());
+                        if let Some(ref open_id) = sender_open_id {
+                            meta.insert("sender_id".to_string(), open_id.clone());
+                            meta.insert("open_id".to_string(), open_id.clone());
+                        }
+                        meta.insert("chat_id".to_string(), chat_id.clone());
                         (CommMessageType::Text, text, meta)
                     }
                     "image" => {
@@ -760,6 +771,11 @@ impl LarkWebSocketClient {
                         let mut meta = std::collections::HashMap::new();
                         meta.insert("message_id".to_string(), message_id.clone());
                         meta.insert("image_key".to_string(), image_key.clone());
+                        if let Some(ref open_id) = sender_open_id {
+                            meta.insert("sender_id".to_string(), open_id.clone());
+                            meta.insert("open_id".to_string(), open_id.clone());
+                        }
+                        meta.insert("chat_id".to_string(), chat_id.clone());
                         // For now, treat as text with image key for processing
                         (
                             CommMessageType::Text,
