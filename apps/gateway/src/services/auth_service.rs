@@ -109,10 +109,10 @@ impl AuthService {
         .await
         .map_err(|e| AppError::Internal(format!("Database error: {}", e)))?;
 
-        let row = row.ok_or_else(|| AppError::Internal("Invalid credentials".to_string()))?;
+        let row = row.ok_or_else(|| AppError::Unauthorized("Invalid credentials".to_string()))?;
 
         verify_password(password, &row.password_hash)
-            .map_err(|_| AppError::Internal("Invalid credentials".to_string()))?;
+            .map_err(|_| AppError::Unauthorized("Invalid credentials".to_string()))?;
 
         Ok(row.to_auth_user_info())
     }

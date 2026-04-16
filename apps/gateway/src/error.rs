@@ -48,6 +48,10 @@ pub enum AppError {
     #[error("Validation error")]
     Validation(Vec<ValidationError>),
 
+    /// Unauthorized
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
     /// Internal error
     #[error("Internal error: {0}")]
     Internal(String),
@@ -110,6 +114,10 @@ impl From<AppError> for GatewayError {
                     })
                     .collect(),
             ),
+            AppError::Unauthorized(msg) => GatewayError::Unauthorized {
+                message: msg,
+                code: "AUTH_FAILED".to_string(),
+            },
             AppError::Internal(msg) => GatewayError::internal(msg),
         }
     }
