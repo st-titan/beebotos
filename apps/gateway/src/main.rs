@@ -151,6 +151,8 @@ pub struct AppState {
     pub webchat_service: Option<Arc<crate::services::webchat_service::WebchatService>>,
     /// Memory system for agent memory coordination
     pub memory_system: Option<Arc<beebotos_agents::memory::UnifiedMemorySystem>>,
+    /// Authentication service
+    pub auth_service: Option<Arc<crate::services::AuthService>>,
 }
 
 impl AppState {
@@ -209,6 +211,13 @@ impl AppState {
         let webchat_service = {
             let svc = crate::services::webchat_service::WebchatService::new(db.clone());
             info!("✅ WebchatService initialized");
+            Some(Arc::new(svc))
+        };
+
+        // Initialize AuthService
+        let auth_service = {
+            let svc = crate::services::AuthService::new(db.clone());
+            info!("✅ AuthService initialized");
             Some(Arc::new(svc))
         };
 
@@ -426,6 +435,7 @@ impl AppState {
             channel_binding_store: Some(channel_binding_store),
             webchat_service,
             memory_system,
+            auth_service,
         })
     }
 }
@@ -987,6 +997,10 @@ fn create_router(app_state: Arc<AppState>, gateway_state: Arc<GatewayState>) -> 
         .route("/live", get(liveness_handler))
         .route("/status", get(system_status_handler))
         .route("/metrics", get(telemetry::metrics_handler))
+        // Auth routes (public)
+        .route("/api/v1/auth/login", post(handlers::http::auth::login))
+        .route("/api/v1/auth/register", post(handlers::http::auth::register))
+        .route("/api/v1/auth/refresh", post(handlers::http::auth::refresh_token))
         // WebSocket status endpoint (public for health checks)
         .route("/ws/status", get(handlers::websocket::ws_status_handler))
         // Webhook routes
@@ -1089,6 +1103,9 @@ fn create_router(app_state: Arc<AppState>, gateway_state: Arc<GatewayState>) -> 
         .route("/api/v1/skills/:id/uninstall", delete(handlers::http::skills::uninstall_skill))
         .route("/api/v1/skills/:id/execute", post(handlers::http::skills::execute_skill))
         .route("/api/v1/skills/hub/health", get(handlers::http::skills::hub_health))
+        // Auth routes (protected)
+        .route("/api/v1/auth/logout", post(handlers::http::auth::logout))
+        .route("/api/v1/auth/me", get(handlers::http::auth::me))
         // Webchat routes
         .route("/api/v1/webchat/sessions", get(handlers::http::webchat::list_sessions))
         .route("/api/v1/webchat/sessions", post(handlers::http::webchat::create_session))

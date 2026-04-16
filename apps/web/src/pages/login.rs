@@ -3,6 +3,7 @@
 use crate::api::AuthService;
 use crate::i18n::I18nContext;
 use crate::state::{use_auth_state, Permission, Role, User};
+use gloo_storage::Storage;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use leptos::view;
@@ -97,12 +98,19 @@ pub fn LoginPage() -> impl IntoView {
                             response.expires_in,
                         );
 
-                        // Navigate to home
-                        nav("/", Default::default());
+                        // Navigate to redirect target or home
+                        let redirect_path = gloo_storage::SessionStorage::raw()
+                            .get_item("redirect_after_login")
+                            .ok()
+                            .flatten()
+                            .filter(|p| !p.is_empty() && p != "/login" && p != "/register")
+                            .unwrap_or_else(|| "/".to_string());
+                        let _ = gloo_storage::SessionStorage::raw().remove_item("redirect_after_login");
+                        nav(&redirect_path, Default::default());
                     }
                     Err(e) => {
                         set_error.set(Some(format!(
-                            "{}: {:?}",
+                            "{}: {}",
                             i18n.t("login-error-failed"),
                             e
                         )));
@@ -111,52 +119,6 @@ pub fn LoginPage() -> impl IntoView {
 
                 set_is_loading.set(false);
             });
-        }
-    };
-
-    // Demo login handler
-    let handle_demo_login = {
-        let auth_state = auth_state.clone();
-        let navigate = navigate.clone();
-        move |_| {
-            let auth = auth_state.clone();
-            let nav = navigate.clone();
-            let user_name = username.get();
-
-            // Create a demo user
-            let demo_user = User {
-                id: "demo-user".to_string(),
-                name: if user_name.is_empty() {
-                    "Demo User".to_string()
-                } else {
-                    user_name
-                },
-                email: Some("demo@beebotos.local".to_string()),
-                avatar: None,
-                wallet_address: None,
-                roles: vec![Role::Admin, Role::Operator],
-                permissions: vec![
-                    Permission::AgentCreate,
-                    Permission::AgentRead,
-                    Permission::AgentUpdate,
-                    Permission::AgentDelete,
-                    Permission::AgentStart,
-                    Permission::AgentStop,
-                    Permission::DaoVote,
-                    Permission::DaoCreateProposal,
-                    Permission::SettingsRead,
-                    Permission::SettingsWrite,
-                ],
-            };
-
-            auth.set_authenticated(
-                demo_user,
-                "demo-token".to_string(),
-                "demo-refresh-token".to_string(),
-                3600,
-            );
-
-            nav("/", Default::default());
         }
     };
 
@@ -207,18 +169,6 @@ pub fn LoginPage() -> impl IntoView {
                         }}
                     </button>
                 </div>
-
-                <div class="login-divider">
-                    <span>{move || i18n_stored.get_value().t("login-or")}</span>
-                </div>
-
-                <button
-                    class="btn-secondary btn-block"
-                    on:click=handle_demo_login
-                    disabled=move || is_loading.get()
-                >
-                    {move || i18n_stored.get_value().t("login-demo-button")}
-                </button>
 
                 <div class="login-footer">
                     <p>

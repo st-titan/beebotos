@@ -14,7 +14,7 @@ use crate::api::{
 };
 use crate::state::{
     agent::{provide_agent_state, AgentState},
-    auth::{provide_auth_state, use_auth_state, AuthState},
+    auth::{AuthState},
     browser::{provide_browser_state, BrowserState},
     dao::{provide_dao_state, DaoState},
     gateway::{provide_gateway_state, GatewayConnectionState},
@@ -96,42 +96,42 @@ impl AppState {
 
     /// Get agent service
     pub fn agent_service(&self) -> AgentService {
-        AgentService::new(self.api_client.clone())
+        AgentService::new(self.api_client())
     }
 
     /// Get DAO service
     pub fn dao_service(&self) -> DaoService {
-        DaoService::new(self.api_client.clone())
+        DaoService::new(self.api_client())
     }
 
     /// Get skill service
     pub fn skill_service(&self) -> SkillService {
-        SkillService::new(self.api_client.clone())
+        SkillService::new(self.api_client())
     }
 
     /// Get treasury service
     pub fn treasury_service(&self) -> TreasuryService {
-        TreasuryService::new(self.api_client.clone())
+        TreasuryService::new(self.api_client())
     }
 
     /// Get settings service
     pub fn settings_service(&self) -> SettingsService {
-        SettingsService::new(self.api_client.clone())
+        SettingsService::new(self.api_client())
     }
 
     /// Get auth service
     pub fn auth_service(&self) -> AuthService {
-        AuthService::new(self.api_client.clone())
+        AuthService::new(self.api_client())
     }
 
     /// Get browser API service (OpenClaw V2026.3.13 新增)
     pub fn browser_service(&self) -> BrowserApiService {
-        BrowserApiService::new(self.api_client.clone())
+        BrowserApiService::new(self.api_client())
     }
 
     /// Get WebChat API service (OpenClaw V2026.3.13 新增)
     pub fn webchat_service(&self) -> WebchatApiService {
-        WebchatApiService::new(self.api_client.clone())
+        WebchatApiService::new(self.api_client())
     }
 
     /// Set online status

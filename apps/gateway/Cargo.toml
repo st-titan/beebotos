@@ -49,6 +49,9 @@ hex = "0.4"
 # Authentication & Security - using gateway-lib's auth
 jsonwebtoken = { workspace = true }
 bcrypt = { workspace = true }
+argon2 = "0.5"
+password-hash = "0.5"
+rand_core = { version = "0.6", features = ["std"] }
 hmac = "0.12"
 sha2 = "0.10"
 sha3 = "0.10"

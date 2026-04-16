@@ -4,6 +4,7 @@
 
 pub mod agents;
 pub mod agents_v2;
+pub mod auth;
 pub mod chain;
 pub mod chain_v2;
 pub mod channels;

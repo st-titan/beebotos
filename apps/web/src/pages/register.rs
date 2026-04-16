@@ -117,7 +117,7 @@ pub fn RegisterPage() -> impl IntoView {
                     }
                     Err(e) => {
                         set_error.set(Some(format!(
-                            "{}: {:?}",
+                            "{}: {}",
                             i18n.t("register-error-failed"),
                             e
                         )));
@@ -126,49 +126,6 @@ pub fn RegisterPage() -> impl IntoView {
 
                 set_is_loading.set(false);
             });
-        }
-    };
-
-    // Demo register for testing
-    let handle_demo_register = {
-        let auth_state = auth_state.clone();
-        let navigate = navigate.clone();
-        move |_| {
-            let auth = auth_state.clone();
-            let nav = navigate.clone();
-
-            // Create a demo user
-            let demo_user = User {
-                id: format!("user-{}", username.get().replace(" ", "-")),
-                name: if username.get().is_empty() {
-                    "New User".to_string()
-                } else {
-                    username.get()
-                },
-                email: if email.get().is_empty() {
-                    Some("user@beebotos.local".to_string())
-                } else {
-                    Some(email.get())
-                },
-                avatar: None,
-                wallet_address: None,
-                roles: vec![Role::Member],
-                permissions: vec![
-                    Permission::AgentRead,
-                    Permission::AgentCreate,
-                    Permission::DaoVote,
-                    Permission::SettingsRead,
-                ],
-            };
-
-            auth.set_authenticated(
-                demo_user,
-                "demo-token".to_string(),
-                "demo-refresh-token".to_string(),
-                3600,
-            );
-
-            nav("/", Default::default());
         }
     };
 
@@ -239,18 +196,6 @@ pub fn RegisterPage() -> impl IntoView {
                         }}
                     </button>
                 </div>
-
-                <div class="login-divider">
-                    <span>{move || i18n_stored.get_value().t("register-or")}</span>
-                </div>
-
-                <button
-                    class="btn-secondary btn-block"
-                    on:click=handle_demo_register
-                    disabled=move || is_loading.get()
-                >
-                    {move || i18n_stored.get_value().t("register-demo-button")}
-                </button>
 
                 <div class="login-footer">
                     <p>

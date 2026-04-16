@@ -2,7 +2,7 @@ use crate::i18n::{I18nContext, Locale};
 use crate::state::use_app_state;
 use leptos::prelude::*;
 use leptos_router::components::A;
-use leptos_router::hooks::use_location;
+use leptos_router::hooks::{use_location, use_navigate};
 
 #[component]
 pub fn Sidebar() -> impl IntoView {
@@ -203,6 +203,7 @@ fn UserMenu(
 ) -> impl IntoView {
     let app_state_stored = StoredValue::new(app_state);
     let i18n_stored = StoredValue::new(i18n);
+    let navigate = use_navigate();
 
     let is_authenticated = Signal::derive(move || app_state_stored.get_value().is_authenticated());
     let user_name = Signal::derive(move || {
@@ -215,14 +216,28 @@ fn UserMenu(
     view! {
         {move || if is_authenticated.get() {
             view! {
-                <div class="user-info">
-                    <div class="user-avatar">
-                        {user_name.get().chars().next().unwrap_or('U').to_uppercase().to_string()}
+                <div class="user-menu">
+                    <div class="user-info">
+                        <div class="user-avatar">
+                            {user_name.get().chars().next().unwrap_or('U').to_uppercase().to_string()}
+                        </div>
+                        <div class="user-details">
+                            <span class="user-name">{user_name.get()}</span>
+                            <span class="user-status">"Online"</span>
+                        </div>
                     </div>
-                    <div class="user-details">
-                        <span class="user-name">{user_name.get()}</span>
-                        <span class="user-status">"Online"</span>
-                    </div>
+                    <button
+                        class="btn btn-sm btn-secondary btn-block"
+                        on:click={
+                            let nav = navigate.clone();
+                            move |_| {
+                                app_state_stored.get_value().auth.logout();
+                                nav("/login", Default::default());
+                            }
+                        }
+                    >
+                        {move || i18n_stored.get_value().t("action-logout")}
+                    </button>
                 </div>
             }.into_any()
         } else {
