@@ -232,6 +232,19 @@ All runtime configuration files must be placed under the `config/` directory. Do
 ### Sensitive information (`.env`)
 All secrets, API keys, tokens, passwords, and private keys must be stored in a `.env` file (loaded via `dotenvy` or similar) and must never be hard-coded in source files or committed to version control. Ensure `.env` is listed in `.gitignore`.
 
+### Git Remote Naming
+This repository follows the standard fork workflow. Remotes must be named as:
+
+- **`origin`** — Your personal fork (`git@github.com:patrickquan/beebotos.git`). Push feature branches and commits here.
+- **`upstream`** — The original repository (`git@wangyujie.github.com:wangyujie2024/beebotos.git`). Fetch upstream updates from here.
+
+Typical workflow:
+```bash
+git fetch upstream
+git merge upstream/main
+git push origin main
+```
+
 ## Notes for Agents
 
 - When working on `crates/agents`, do not introduce direct dependencies on `axum` or other web frameworks. Use `beebotos-gateway-lib` for HTTP concerns.

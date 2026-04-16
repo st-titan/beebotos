@@ -34,7 +34,7 @@ $Services = @(
     },
     @{
         Name = "web"
-        BuildCmd = "cargo build --release -p beebotos-web --target wasm32-unknown-unknown; if (`$?) { cargo build --release -p beebotos-web --bin web-server }"
+        BuildCmd = "cargo build --release --lib -p beebotos-web --target wasm32-unknown-unknown; if (`$?) { cargo build --release --bin web-server }"
         Binary = "target\release\web-server.exe"
         Port = 8090
         Desc = "Web Frontend Server"
@@ -42,7 +42,7 @@ $Services = @(
     @{
         Name = "beehub"
         BuildCmd = "cargo build --release -p beebotos-beehub"
-        Binary = "target\release\beebotos-beehub.exe"
+        Binary = "target\release\beehub.exe"
         Port = 8080
         Desc = "BeeHub Service"
     },
