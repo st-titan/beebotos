@@ -11,7 +11,7 @@ use sqlx::SqlitePool;
 
 use crate::error::AppError;
 
-const DEFAULT_ROLES: &str = "member";
+const DEFAULT_ROLES: &str = "user";
 const DEFAULT_PERMISSIONS: &str = "agentRead,agentCreate,daoVote,settingsRead";
 
 /// Authenticated user info (non-sensitive)
