@@ -314,7 +314,13 @@ impl GatewayError {
             Self::NotFound { resource, id } => format!("{} '{}' not found", resource, id),
             Self::RateLimited { .. } => "Rate limit exceeded. Please try again later.".to_string(),
             Self::BadRequest { message, .. } => message.clone(),
-            Self::Validation { .. } => "Validation failed".to_string(),
+            Self::Validation { errors } => {
+                if let Some(first) = errors.first() {
+                    format!("Validation failed: {}", first.message)
+                } else {
+                    "Validation failed".to_string()
+                }
+            }
             Self::Internal { .. } => {
                 "An internal error occurred. Please try again later.".to_string()
             }

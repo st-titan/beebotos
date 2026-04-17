@@ -281,8 +281,8 @@ impl From<crate::api::ApiError> for AppError {
         match err {
             crate::api::ApiError::Network(msg) => AppError::network_offline().with_details(msg),
             crate::api::ApiError::Timeout => AppError::network_timeout(),
-            crate::api::ApiError::Unauthorized => {
-                AppError::new(ErrorCode::AuthUnauthorized, "Unauthorized")
+            crate::api::ApiError::Unauthorized(msg) => {
+                AppError::new(ErrorCode::AuthUnauthorized, msg)
             }
             crate::api::ApiError::Forbidden => {
                 AppError::new(ErrorCode::AuthForbidden, "Access denied")

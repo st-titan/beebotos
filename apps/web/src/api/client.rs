@@ -253,8 +253,6 @@ impl ApiClient {
 
         if api_response.is_success() {
             api_response.json()
-        } else if api_response.status == 401 {
-            Err(ApiError::Unauthorized)
         } else {
             Err(ApiError::from_response(&api_response))
         }
@@ -546,7 +544,7 @@ pub enum ApiError {
     Network(String),
     Serialization(String),
     NotFound,
-    Unauthorized,
+    Unauthorized(String),
     Forbidden,
     ClientError(u16, String),
     ServerError(u16, String),
@@ -566,7 +564,7 @@ impl ApiError {
         };
 
         match status {
-            401 => ApiError::Unauthorized,
+            401 => ApiError::Unauthorized(message),
             403 => ApiError::Forbidden,
             404 => ApiError::NotFound,
             400..=499 => ApiError::ClientError(status, message),
@@ -587,7 +585,13 @@ impl ApiError {
     pub fn user_message(&self) -> String {
         match self {
             ApiError::Network(msg) => format!("Network error: {}", msg),
-            ApiError::Unauthorized => "Please log in again".to_string(),
+            ApiError::Unauthorized(msg) => {
+                if msg.is_empty() {
+                    "Please log in again".to_string()
+                } else {
+                    msg.clone()
+                }
+            }
             ApiError::Forbidden => "You don't have permission to do this".to_string(),
             ApiError::NotFound => "Resource not found".to_string(),
             ApiError::Timeout => "Request timed out, please try again".to_string(),
@@ -708,7 +712,7 @@ mod tests {
         assert!(ApiError::Network("test".to_string()).is_retryable());
         assert!(ApiError::ServerError(500, "error".to_string()).is_retryable());
         assert!(!ApiError::ClientError(400, "error".to_string()).is_retryable());
-        assert!(!ApiError::Unauthorized.is_retryable());
+        assert!(!ApiError::Unauthorized("test".to_string()).is_retryable());
     }
 
     #[test]
