@@ -1316,7 +1316,7 @@ async fn shutdown_signal() {
 }
 
 #[cfg(test)]
-pub async fn create_test_state_with_auth(pool: SqlitePool) -> Arc<AppState> {
+pub(crate) async fn create_test_state_with_auth(pool: SqlitePool) -> Arc<AppState> {
     use crate::config::BeeBotOSConfig;
     let config = tests::create_test_config();
     let rate_limiter = Arc::new(RateLimitManager::new(Arc::new(
