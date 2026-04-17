@@ -761,6 +761,7 @@ mod tests {
                 auto_reply: true,
                 enable_typing_indicator: true,
                 enabled_platforms: vec!["lark".to_string()],
+                default_agent_id: None,
                 lark: None,
                 dingtalk: None,
                 telegram: None,
@@ -768,6 +769,7 @@ mod tests {
                 slack: None,
                 wechat: None,
                 personal_wechat: None,
+                webchat: None,
                 teams: None,
                 twitter: None,
                 whatsapp: None,
@@ -818,6 +820,7 @@ mod tests {
                 dao_contract_address: None,
                 skill_nft_contract_address: None,
             },
+            wizard: WizardConfig::default(),
         };
 
         assert!(config.validate().is_ok());
