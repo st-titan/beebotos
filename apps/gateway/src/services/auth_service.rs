@@ -15,7 +15,7 @@ const DEFAULT_ROLES: &str = "user";
 const DEFAULT_PERMISSIONS: &str = "agentRead,agentCreate,daoVote,settingsRead";
 
 /// Authenticated user info (non-sensitive)
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct AuthUserInfo {
     pub id: String,
     #[serde(rename = "name")]

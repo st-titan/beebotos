@@ -1316,12 +1316,32 @@ async fn shutdown_signal() {
 }
 
 #[cfg(test)]
+pub async fn create_test_state_with_auth(pool: SqlitePool) -> Arc<AppState> {
+    use crate::config::BeeBotOSConfig;
+    let config = tests::create_test_config();
+    let rate_limiter = Arc::new(RateLimitManager::new(Arc::new(
+        gateway::rate_limit::token_bucket::TokenBucketRateLimiter::new(100.0, 200),
+    )));
+    let kernel = Arc::new(
+        beebotos_kernel::KernelBuilder::new()
+            .with_max_agents(100)
+            .build()
+            .unwrap(),
+    );
+    Arc::new(
+        AppState::new(config, pool, None, rate_limiter, kernel)
+            .await
+            .unwrap(),
+    )
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
 
     /// Create a test configuration for unit tests
-    fn create_test_config() -> BeeBotOSConfig {
+    pub(crate) fn create_test_config() -> BeeBotOSConfig {
         BeeBotOSConfig {
             system_name: "BeeBotOS".to_string(),
             version: "2.0.0".to_string(),
