@@ -537,6 +537,35 @@ pub struct UserInfo {
     pub permissions: Vec<String>,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_login_request_serialization() {
+        let req = serde_json::json!({
+            "username": "alice",
+            "password": "secret"
+        });
+        let s = req.to_string();
+        assert!(s.contains("alice"));
+        assert!(s.contains("secret"));
+    }
+
+    #[test]
+    fn test_register_request_serialization() {
+        let req = serde_json::json!({
+            "username": "bob",
+            "email": "bob@example.com",
+            "password": "password123"
+        });
+        let s = req.to_string();
+        assert!(s.contains("bob"));
+        assert!(s.contains("bob@example.com"));
+        assert!(s.contains("password123"));
+    }
+}
+
 // ==================== Channel Models ====================
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
