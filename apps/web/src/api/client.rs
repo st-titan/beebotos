@@ -731,4 +731,47 @@ mod tests {
         assert!(sanitized.contains("***REDACTED***"));
         assert!(sanitized.contains("admin")); // non-sensitive should remain
     }
+
+    #[test]
+    fn test_api_error_from_response_extracts_message() {
+        let body = br#"{"success":false,"error":{"code":"VALIDATION_ERROR","message":"username already exists"}}"#;
+        let response = ApiResponse {
+            status: 422,
+            headers: std::collections::HashMap::new(),
+            body: body.to_vec(),
+        };
+
+        let err = ApiError::from_response(&response);
+        match err {
+            ApiError::ClientError(code, msg) => {
+                assert_eq!(code, 422);
+                assert_eq!(msg, "username already exists");
+            }
+            _ => panic!("Expected ClientError, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_api_error_from_response_fallback_when_no_json() {
+        let response = ApiResponse {
+            status: 400,
+            headers: std::collections::HashMap::new(),
+            body: b"bad request".to_vec(),
+        };
+
+        let err = ApiError::from_response(&response);
+        match err {
+            ApiError::ClientError(code, msg) => {
+                assert_eq!(code, 400);
+                assert!(msg.is_empty());
+            }
+            _ => panic!("Expected ClientError, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_api_error_user_message_with_backend_msg() {
+        let err = ApiError::ClientError(422, "username already exists".to_string());
+        assert_eq!(err.user_message(), "username already exists");
+    }
 }

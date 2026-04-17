@@ -2011,6 +2011,7 @@ dependencies = [
  "sha2",
  "sha3",
  "sqlx",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
