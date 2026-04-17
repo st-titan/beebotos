@@ -19,14 +19,14 @@ use crate::{
 };
 
 /// Login request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
 }
 
 /// Register request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RegisterRequest {
     pub username: String,
     pub email: Option<String>,
@@ -34,7 +34,7 @@ pub struct RegisterRequest {
 }
 
 /// Auth response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AuthResponse {
     pub access_token: String,
     pub refresh_token: String,
@@ -195,4 +195,214 @@ pub async fn me(
     let auth_service = get_auth_service(&state)?;
     let user = auth_service.get_user_by_id(&auth_user.user_id).await?;
     Ok(Json(user))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use axum::routing::post;
+    use tower::ServiceExt;
+    use sqlx::sqlite::SqlitePool;
+
+    async fn create_test_pool() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("connect");
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE,
+                password_hash TEXT NOT NULL,
+                avatar TEXT,
+                wallet_address TEXT,
+                roles TEXT NOT NULL DEFAULT 'user',
+                permissions TEXT NOT NULL DEFAULT 'agentRead,agentCreate,daoVote,settingsRead'
+            )"
+        )
+        .execute(&pool)
+        .await
+        .expect("create table");
+        pool
+    }
+
+    fn auth_router(state: Arc<AppState>) -> axum::Router {
+        axum::Router::new()
+            .route("/api/v1/auth/register", post(register))
+            .route("/api/v1/auth/login", post(login))
+            .route("/api/v1/auth/refresh", post(refresh_token))
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn test_register_handler_success() {
+        let pool = create_test_pool().await;
+        let state = crate::create_test_state_with_auth(pool).await;
+        let app = auth_router(state);
+
+        let body = serde_json::to_string(&RegisterRequest {
+            username: "handler_alice".to_string(),
+            email: Some("alice@example.com".to_string()),
+            password: "password123".to_string(),
+        })
+        .unwrap();
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/api/v1/auth/register")
+            .header("Content-Type", "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let auth_resp: AuthResponse = serde_json::from_slice(&body_bytes).unwrap();
+        assert_eq!(auth_resp.user.username, "handler_alice");
+        assert!(!auth_resp.access_token.is_empty());
+        assert!(!auth_resp.refresh_token.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_register_handler_duplicate() {
+        let pool = create_test_pool().await;
+        let state = crate::create_test_state_with_auth(pool).await;
+        let app = auth_router(state.clone());
+
+        let body = serde_json::to_string(&RegisterRequest {
+            username: "handler_bob".to_string(),
+            email: None,
+            password: "password123".to_string(),
+        })
+        .unwrap();
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/api/v1/auth/register")
+            .header("Content-Type", "application/json")
+            .body(Body::from(body.clone()))
+            .unwrap();
+
+        let response = app.clone().oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let response2 = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/auth/register")
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response2.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn test_login_handler_success() {
+        let pool = create_test_pool().await;
+        let state = crate::create_test_state_with_auth(pool).await;
+        let app = auth_router(state.clone());
+
+        let register_body = serde_json::to_string(&RegisterRequest {
+            username: "handler_charlie".to_string(),
+            email: None,
+            password: "securepass".to_string(),
+        })
+        .unwrap();
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/auth/register")
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(register_body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let login_body = serde_json::to_string(&LoginRequest {
+            username: "handler_charlie".to_string(),
+            password: "securepass".to_string(),
+        })
+        .unwrap();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/auth/login")
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(login_body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let auth_resp: AuthResponse = serde_json::from_slice(&body_bytes).unwrap();
+        assert_eq!(auth_resp.user.username, "handler_charlie");
+    }
+
+    #[tokio::test]
+    async fn test_login_handler_wrong_password() {
+        let pool = create_test_pool().await;
+        let state = crate::create_test_state_with_auth(pool).await;
+        let app = auth_router(state.clone());
+
+        let register_body = serde_json::to_string(&RegisterRequest {
+            username: "handler_dave".to_string(),
+            email: None,
+            password: "correctpass".to_string(),
+        })
+        .unwrap();
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/auth/register")
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(register_body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let login_body = serde_json::to_string(&LoginRequest {
+            username: "handler_dave".to_string(),
+            password: "wrongpass".to_string(),
+        })
+        .unwrap();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/auth/login")
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(login_body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
 }
