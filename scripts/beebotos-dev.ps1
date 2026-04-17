@@ -73,10 +73,10 @@ function Get-PidFile($name) {
 function Test-IsRunning($name) {
     $pidFile = Get-PidFile $name
     if (Test-Path $pidFile) {
-        $pid = Get-Content $pidFile -Raw
-        $pid = $pid.Trim()
+        $svcPid = Get-Content $pidFile -Raw
+        $svcPid = $svcPid.Trim()
         try {
-            $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+            $proc = Get-Process -Id $svcPid -ErrorAction SilentlyContinue
             if ($proc) { return $true }
         } catch {}
     }
@@ -122,8 +122,8 @@ function Start-Service($name) {
 
     $pidFile = Get-PidFile $name
     if (Test-IsRunning $name) {
-        $pid = (Get-Content $pidFile -Raw).Trim()
-        Print-Warn "$name is already running (PID: $pid)"
+        $svcPid = (Get-Content $pidFile -Raw).Trim()
+        Print-Warn "$name is already running (PID: $svcPid)"
         return $true
     }
 
@@ -139,7 +139,8 @@ function Start-Service($name) {
     Print-Info "Port: $($svc.Port)"
 
     $logFile = Join-Path $PidDir "$name.log"
-    $proc = Start-Process -FilePath $binaryPath -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru -WindowStyle Hidden
+    $errLogFile = Join-Path $PidDir "$name.err.log"
+    $proc = Start-Process -FilePath $binaryPath -RedirectStandardOutput $logFile -RedirectStandardError $errLogFile -PassThru -WindowStyle Hidden
     $proc.Id | Set-Content $pidFile -NoNewline
 
     Start-Sleep -Seconds 1
@@ -164,11 +165,11 @@ function Stop-Service($name) {
         return
     }
 
-    $pid = (Get-Content $pidFile -Raw).Trim()
-    Write-Host "Stopping $name (PID: $pid)..." -ForegroundColor Cyan
+    $svcPid = (Get-Content $pidFile -Raw).Trim()
+    Write-Host "Stopping $name (PID: $svcPid)..." -ForegroundColor Cyan
 
     try {
-        Stop-Process -Id $pid -Force -ErrorAction Stop
+        Stop-Process -Id $svcPid -Force -ErrorAction Stop
         Print-Success "$name stopped"
     } catch {
         Print-Warn "Could not stop $name gracefully: $($_.Exception.Message)"
@@ -245,8 +246,8 @@ function Show-Status {
         }
         $pidFile = Get-PidFile $svc.Name
         if (Test-IsRunning $svc.Name) {
-            $pid = (Get-Content $pidFile -Raw).Trim()
-            $line = "{0,-12} {1,-10} {2,-8} {3}" -f $svc.Name, "running", $pid, $svc.Port
+            $svcPid = (Get-Content $pidFile -Raw).Trim()
+            $line = "{0,-12} {1,-10} {2,-8} {3}" -f $svc.Name, "running", $svcPid, $svc.Port
             Write-Host $line -ForegroundColor Green
         } else {
             $line = "{0,-12} {1,-10} {2,-8} {3}" -f $svc.Name, "stopped", "-", $svc.Port
