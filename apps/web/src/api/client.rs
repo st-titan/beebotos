@@ -253,10 +253,8 @@ impl ApiClient {
 
         if api_response.is_success() {
             api_response.json()
-        } else if api_response.status == 401 {
-            Err(ApiError::Unauthorized)
         } else {
-            Err(ApiError::from_status(api_response.status))
+            Err(ApiError::from_response(&api_response))
         }
     }
 
@@ -460,7 +458,7 @@ impl ApiClient {
                     self.store_cache(&cache_key, data);
                     response.json()
                 } else {
-                    Err(ApiError::from_status(response.status))
+                    Err(ApiError::from_response(&response))
                 }
             }
             Err(e) => Err(e),
@@ -483,7 +481,7 @@ impl ApiClient {
         if response.is_success() {
             response.json()
         } else {
-            Err(ApiError::from_status(response.status))
+            Err(ApiError::from_response(&response))
         }
     }
 
@@ -502,7 +500,7 @@ impl ApiClient {
         if response.is_success() {
             response.json()
         } else {
-            Err(ApiError::from_status(response.status))
+            Err(ApiError::from_response(&response))
         }
     }
 
@@ -516,7 +514,7 @@ impl ApiClient {
         if response.is_success() || response.status == 204 {
             Ok(())
         } else {
-            Err(ApiError::from_status(response.status))
+            Err(ApiError::from_response(&response))
         }
     }
 }
@@ -527,29 +525,50 @@ impl Default for ApiClient {
     }
 }
 
+/// Backend error response structure
+#[derive(Debug, Clone, serde::Deserialize, PartialEq)]
+pub struct ErrorResponse {
+    pub success: bool,
+    pub error: ErrorDetail,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, PartialEq)]
+pub struct ErrorDetail {
+    pub code: String,
+    pub message: String,
+}
+
 /// API Error types
 #[derive(Debug, Clone, PartialEq)]
 pub enum ApiError {
     Network(String),
     Serialization(String),
     NotFound,
-    Unauthorized,
+    Unauthorized(String),
     Forbidden,
-    ClientError(u16),
-    ServerError(u16),
+    ClientError(u16, String),
+    ServerError(u16, String),
     Timeout,
     Cancelled,
     Unknown,
 }
 
 impl ApiError {
-    fn from_status(status: u16) -> Self {
+    fn from_response(response: &ApiResponse) -> Self {
+        let status = response.status;
+        // Try to parse backend error message
+        let message = if let Ok(err_resp) = serde_json::from_slice::<ErrorResponse>(&response.body) {
+            err_resp.error.message
+        } else {
+            String::new()
+        };
+
         match status {
-            401 => ApiError::Unauthorized,
+            401 => ApiError::Unauthorized(message),
             403 => ApiError::Forbidden,
             404 => ApiError::NotFound,
-            400..=499 => ApiError::ClientError(status),
-            500..=599 => ApiError::ServerError(status),
+            400..=499 => ApiError::ClientError(status, message),
+            500..=599 => ApiError::ServerError(status, message),
             _ => ApiError::Unknown,
         }
     }
@@ -558,7 +577,7 @@ impl ApiError {
     pub fn is_retryable(&self) -> bool {
         matches!(
             self,
-            ApiError::Network(_) | ApiError::ServerError(_) | ApiError::Timeout | ApiError::Unknown
+            ApiError::Network(_) | ApiError::ServerError(_, _) | ApiError::Timeout | ApiError::Unknown
         )
     }
 
@@ -566,14 +585,33 @@ impl ApiError {
     pub fn user_message(&self) -> String {
         match self {
             ApiError::Network(msg) => format!("Network error: {}", msg),
-            ApiError::Unauthorized => "Please log in again".to_string(),
+            ApiError::Unauthorized(msg) => {
+                if msg.is_empty() {
+                    "Please log in again".to_string()
+                } else {
+                    msg.clone()
+                }
+            }
             ApiError::Forbidden => "You don't have permission to do this".to_string(),
             ApiError::NotFound => "Resource not found".to_string(),
             ApiError::Timeout => "Request timed out, please try again".to_string(),
-            ApiError::ServerError(code) => {
-                format!("Server error ({}), please try again later", code)
+            ApiError::ServerError(code, msg) => {
+                if msg.is_empty() {
+                    format!("Server error ({}), please try again later", code)
+                } else {
+                    msg.clone()
+                }
             }
-            _ => "An unexpected error occurred".to_string(),
+            ApiError::ClientError(code, msg) => {
+                if msg.is_empty() {
+                    format!("Request error ({}), please check your input", code)
+                } else {
+                    msg.clone()
+                }
+            }
+            ApiError::Serialization(msg) => format!("Data error: {}", msg),
+            ApiError::Cancelled => "Request was cancelled".to_string(),
+            ApiError::Unknown => "An unexpected error occurred".to_string(),
         }
     }
 }
@@ -672,9 +710,9 @@ mod tests {
     #[test]
     fn test_api_error_classification() {
         assert!(ApiError::Network("test".to_string()).is_retryable());
-        assert!(ApiError::ServerError(500).is_retryable());
-        assert!(!ApiError::ClientError(400).is_retryable());
-        assert!(!ApiError::Unauthorized.is_retryable());
+        assert!(ApiError::ServerError(500, "error".to_string()).is_retryable());
+        assert!(!ApiError::ClientError(400, "error".to_string()).is_retryable());
+        assert!(!ApiError::Unauthorized("test".to_string()).is_retryable());
     }
 
     #[test]
@@ -696,5 +734,48 @@ mod tests {
         assert!(!sanitized.contains("abc.def.ghi"));
         assert!(sanitized.contains("***REDACTED***"));
         assert!(sanitized.contains("admin")); // non-sensitive should remain
+    }
+
+    #[test]
+    fn test_api_error_from_response_extracts_message() {
+        let body = br#"{"success":false,"error":{"code":"VALIDATION_ERROR","message":"username already exists"}}"#;
+        let response = ApiResponse {
+            status: 422,
+            headers: std::collections::HashMap::new(),
+            body: body.to_vec(),
+        };
+
+        let err = ApiError::from_response(&response);
+        match err {
+            ApiError::ClientError(code, msg) => {
+                assert_eq!(code, 422);
+                assert_eq!(msg, "username already exists");
+            }
+            _ => panic!("Expected ClientError, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_api_error_from_response_fallback_when_no_json() {
+        let response = ApiResponse {
+            status: 400,
+            headers: std::collections::HashMap::new(),
+            body: b"bad request".to_vec(),
+        };
+
+        let err = ApiError::from_response(&response);
+        match err {
+            ApiError::ClientError(code, msg) => {
+                assert_eq!(code, 400);
+                assert!(msg.is_empty());
+            }
+            _ => panic!("Expected ClientError, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_api_error_user_message_with_backend_msg() {
+        let err = ApiError::ClientError(422, "username already exists".to_string());
+        assert_eq!(err.user_message(), "username already exists");
     }
 }

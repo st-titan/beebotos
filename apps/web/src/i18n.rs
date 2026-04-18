@@ -55,6 +55,28 @@ impl I18nContext {
             .unwrap_or(key)
             .to_string()
     }
+
+    /// Translate a backend API error message into user-friendly localized text.
+    pub fn t_api_error(&self, msg: &str) -> String {
+        let lower = msg.to_lowercase();
+        let key = if lower.contains("invalid credentials") {
+            "error-invalid-credentials"
+        } else if lower.contains("username already exists") {
+            "error-username-already-exists"
+        } else if lower.contains("email already exists") {
+            "error-email-already-exists"
+        } else if lower.contains("validation failed") {
+            "error-validation-failed"
+        } else if lower.contains("please log in again") {
+            "error-please-login-again"
+        } else if lower.contains("unexpected error") {
+            "error-unexpected"
+        } else {
+            // No known mapping: return the original message (or could return a generic key)
+            return msg.to_string();
+        };
+        self.t(key)
+    }
 }
 
 /// Initialize i18n context
@@ -125,6 +147,12 @@ pub fn init_i18n() -> I18nContext {
     zh.insert("register-error-password-mismatch", "两次输入的密码不一致");
     zh.insert("register-error-password-short", "密码长度至少6位");
     zh.insert("register-error-failed", "注册失败");
+    zh.insert("error-invalid-credentials", "用户名或密码错误");
+    zh.insert("error-username-already-exists", "用户名已存在");
+    zh.insert("error-email-already-exists", "邮箱已存在");
+    zh.insert("error-validation-failed", "验证失败");
+    zh.insert("error-unexpected", "发生未知错误");
+    zh.insert("error-please-login-again", "请重新登录");
     zh.insert("register-or", "或");
     zh.insert("register-demo-button", "演示注册");
     zh.insert("register-have-account", "已有账户？");
@@ -314,6 +342,12 @@ pub fn init_i18n() -> I18nContext {
     en.insert("register-error-password-mismatch", "Passwords do not match");
     en.insert("register-error-password-short", "Password must be at least 6 characters");
     en.insert("register-error-failed", "Registration failed");
+    en.insert("error-invalid-credentials", "Invalid credentials");
+    en.insert("error-username-already-exists", "Username already exists");
+    en.insert("error-email-already-exists", "Email already exists");
+    en.insert("error-validation-failed", "Validation failed");
+    en.insert("error-unexpected", "An unexpected error occurred");
+    en.insert("error-please-login-again", "Please log in again");
     en.insert("register-or", "OR");
     en.insert("register-demo-button", "Demo Register");
     en.insert("register-have-account", "Already have an account?");

@@ -116,10 +116,11 @@ pub fn RegisterPage() -> impl IntoView {
                         nav("/", Default::default());
                     }
                     Err(e) => {
+                        let err_msg = i18n.t_api_error(&e.to_string());
                         set_error.set(Some(format!(
                             "{}: {}",
                             i18n.t("register-error-failed"),
-                            e
+                            err_msg
                         )));
                     }
                 }
